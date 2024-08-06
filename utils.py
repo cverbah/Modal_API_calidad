@@ -18,8 +18,8 @@ warnings.filterwarnings('ignore')
 
 
 # envs variables
-load_dotenv()
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'key.json'
+#load_dotenv()
+#os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'key.json'
 CACHE_DIR = '/Users/cvergarabah/.cache/huggingface/hub'
 
 
