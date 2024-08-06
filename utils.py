@@ -12,8 +12,16 @@ from numpy.linalg import norm
 import os
 import warnings
 from tensorflow.python.client import device_lib
+from dotenv import load_dotenv
 plt.style.use('seaborn-white')
 warnings.filterwarnings('ignore')
+
+
+# envs variables
+load_dotenv()
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'key.json'
+CACHE_DIR = '/Users/cvergarabah/.cache/huggingface/hub'
+
 
 # Resnet50v2-avg Pooling
 model_resnet50_v2_avg = tf.keras.applications.ResNet50V2(
@@ -21,15 +29,14 @@ model_resnet50_v2_avg = tf.keras.applications.ResNet50V2(
     weights='imagenet',  # 'imagenet' (pre-training on ImageNet).
     input_tensor=None,
     input_shape=None,
-    pooling='avg',  # global avg pooling will be applied
+    pooling='avg',# global avg pooling will be applied
 )
 
 # VIT Model
 preprocess_img = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
-model_vit = TFViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+model_vit = TFViTModel.from_pretrained("google/vit-base-patch16-224-in21k", cache_dir=CACHE_DIR)
 
 # ########### Functions #####################
-
 
 def crop_product(url_img, blur_kernel=15):
     '''crops a product from an image'''
@@ -62,6 +69,11 @@ def crop_product(url_img, blur_kernel=15):
 
         if img_mode == 'P':
             img = img.convert('RGB', palette=PIL_Image.ADAPTIVE, colors=256)
+
+        if img_mode == 'L':
+            img = img.convert('RGB')
+        else:
+            img = img.convert('RGB')
 
         img = np.array(img)
         #thresholding
@@ -170,8 +182,8 @@ def cosine_distance(url_img1, url_img2, model, crop=0):
 
             imgs = []
             for img in [img1, img2]:
-
-                if img.mode == 'RGBA':  # RGBA
+                # change channels to RGB
+                if img.mode == 'RGBA':
                     img_aux = PIL_Image.new("RGB", img.size, (255, 255, 255))
                     img_aux.paste(img, mask=img.split()[3])
                     img = img_aux
@@ -181,6 +193,11 @@ def cosine_distance(url_img1, url_img2, model, crop=0):
 
                 if img.mode == 'P':
                     img = img.convert('RGB', palette=PIL_Image.ADAPTIVE, colors=256)
+
+                if img.mode == 'L':
+                    img = img.convert('RGB')
+                else:
+                    img = img.convert('RGB')
 
                 imgs.append(img)
             img1 = imgs[0]
@@ -235,6 +252,7 @@ def similarity_score(url_img1, url_img2, model, crop=1, blur_kernel=15):
         score = cosine_distance(url_img1, url_img2, model, crop=crop)
 
     return score
+
 
 def get_available_gpus():
     local_device_protos = device_lib.list_local_devices()
