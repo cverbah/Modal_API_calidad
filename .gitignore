@@ -1,0 +1,8 @@
+# ignore env
+*.env
+__pycache__/
+#ignore idea
+*.idea
+*.json
+*.csv
+key.json
