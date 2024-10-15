@@ -1,20 +1,25 @@
 from modal import Image, Secret, Mount, Volume, App, asgi_app, gpu
 from fastapi import FastAPI, Response, Query, BackgroundTasks, Request
 import matplotlib.pyplot as plt
-from typing import List, Annotated, Union
 from utils import thresholding_display, check_url, similarity_score, get_available_gpus, model_resnet50_v2_avg, model_vit
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 import time
+#from typing import List, Annotated, Union
 
 app = App(name="fastapi-image-similarity")
-image = (Image.micromamba()
-         .micromamba_install("cudatoolkit=11.2", "cudnn=8.1.0", "cuda-nvcc",
-         channels=["conda-forge", "nvidia"],
-        )
-        .pip_install("pandas==2.2.2", "numpy==1.24.3", "matplotlib==3.7.1", "requests", "Pillow==10.3.0",
-                     "opencv-python-headless==4.10.0.84","jax", "jaxlib", "transformers==4.40.0", "nvidia-tensorrt",
-                     "fastapi==0.111.0", "tensorflow~=2.9.1"))
+#image = (Image.micromamba()  # manual installation of cuda for tensorflow
+#         .micromamba_install("cudatoolkit=11.2", "cudnn=8.1.0", "cuda-nvcc",
+#         channels=["conda-forge", "nvidia"],
+#        )
+#        .pip_install("pandas==2.2.2", "numpy==1.24.3", "matplotlib==3.7.1", "requests", "Pillow==10.3.0",
+#                     "opencv-python-headless==4.10.0.84","jax", "jaxlib", "transformers==4.40.0", "nvidia-tensorrt",
+#                     "fastapi==0.111.0", "tensorflow~=2.9.1"))
+dockerhub_image = (Image.from_registry("tensorflow/tensorflow:2.12.0-gpu",)
+                   .pip_install("protobuf==3.20.*", "pandas", "numpy", "matplotlib",
+                                "requests", "Pillow", "opencv-python-headless",
+                                "transformers==4.44.2", "fastapi", "python-dotenv"))
+
 
 class MyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -109,7 +114,7 @@ async def predict_score(url_img_cliente: str, url_img_retail: str, crop: int = Q
         return response
 
 
-@app.function(image=image,
+@app.function(image=dockerhub_image,
               gpu=gpu.T4(count=1),
               secret=Secret.from_name("automatch-secret-keys"),)
 @asgi_app(label='fastapi-image-similarity')

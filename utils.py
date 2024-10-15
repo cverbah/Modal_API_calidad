@@ -18,12 +18,12 @@ warnings.filterwarnings('ignore')
 
 
 # envs variables
-#load_dotenv()
-#os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'key.json'
-CACHE_DIR = '/Users/cvergarabah/.cache/huggingface/hub'
+# load_dotenv()
+# os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'key.json'
+CACHE_DIR = '/Users/cvergarabah/.cache/huggingface/hub'  # needs to be changed to cache dir from deployment OR
+                                                         # delete it <--maybe better
 
-
-# Resnet50v2-avg Pooling
+# model option 1: Resnet50v2-avg Pooling
 model_resnet50_v2_avg = tf.keras.applications.ResNet50V2(
     include_top=False,
     weights='imagenet',  # 'imagenet' (pre-training on ImageNet).
@@ -32,17 +32,17 @@ model_resnet50_v2_avg = tf.keras.applications.ResNet50V2(
     pooling='avg',# global avg pooling will be applied
 )
 
-# VIT Model
+# model option 2: VIT Model (Currently using this one)
 preprocess_img = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
 model_vit = TFViTModel.from_pretrained("google/vit-base-patch16-224-in21k", cache_dir=CACHE_DIR)
 
 # ########### Functions #####################
 
 def crop_product(url_img, blur_kernel=15):
-    '''crops a product from an image'''
+    """modify img channels to RGB and crops a product from an image"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 ...'}
-        # fix possible errors in url: <--- PUEDE SER MEJORADO ESTA PARTE. para casos con la url con ruido
+        # fix possible errors in url: <--- this part can be improved
         if url_img[:8] == 'https://':
             url_img = url_img.split('https://')[-1]
             url_img = 'https://' + url_img
@@ -78,9 +78,9 @@ def crop_product(url_img, blur_kernel=15):
         img = np.array(img)
         #thresholding
         gray = cv2.cvtColor(img.copy(), cv2.COLOR_RGB2GRAY)
-        gray = cv2.blur(gray, (blur_kernel, blur_kernel))
-        thresh = cv2.threshold(gray, 254, 255, cv2.THRESH_BINARY_INV)[1] #min 252 antes
-        #thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY +cv2.THRESH_OTSU)[1] # #BUENO para el caso en que el fondo no es blanco y el color es muy distinto al del objeto
+        gray = cv2.blur(gray, (blur_kernel, blur_kernel))  # apply blurring kernel for smoothing edges
+        thresh = cv2.threshold(gray, 254, 255, cv2.THRESH_BINARY_INV)[1]  # binary thresholding
+        #thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY +cv2.THRESH_OTSU)[1]  # using OTSU thresholding
         alpha = 1  # for undefined cases : x/0 (no white pixels)
         ratio = cv2.countNonZero(thresh)/((img.shape[0] * img.shape[1]) - cv2.countNonZero(thresh) + alpha)
 
@@ -88,10 +88,10 @@ def crop_product(url_img, blur_kernel=15):
             cropped = img
             return img, cropped, thresh, ratio
 
-        # ratio<2,  getting the max countour from img (product)
+        # ratio<2,
         contours, hierarchy = cv2.findContours(thresh, 1, 2)
         max_a = 0
-        for contour in contours:
+        for contour in contours:  # iterate until finding biggest contour to crop
             x_aux, y_aux, w_aux, h_aux = cv2.boundingRect(contour)
             a = w_aux * h_aux
             if a > max_a:
@@ -107,9 +107,9 @@ def crop_product(url_img, blur_kernel=15):
 
 
 def thresholding_display(img1, img2):
-    '''plots the base image, thresholded and cropped'''
+    """"plots 2 images from an url to show the difference once the images are cropped
+    based on the threshold"""
     try:
-
         img1_display, img1_cropped, img1_threshold, img1_ratio = crop_product(img1)
         img1_ratio = round(img1_ratio, 3)
 
@@ -117,21 +117,20 @@ def thresholding_display(img1, img2):
         img2_ratio = round(img2_ratio, 3)
 
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(8, 8)) # define subplots
-        #Customer
-        #original
+        # Image 1
         ax[0,0].set_xlabel('pixels')
         ax[0,0].set_ylabel('pixels')
         ax[0,0].set_title("Original Cliente, crop=0")
         ax[0,0].imshow(img1_display)
-        #thresholded
+        # thresholded
         ax[0,1].set_title("Thresholded")
         ax[0,1].set_xlabel(f'Ratio: {img1_ratio}')
         ax[0,1].imshow(img1_threshold)
-        #cropped
+        # cropped
         ax[0,2].set_title("Cropped, crop=1")
         ax[0,2].imshow(img1_cropped)
 
-        #Retail
+        # Image 2
         ax[1,0].set_xlabel('pixels')
         ax[1,0].set_ylabel('pixels')
         ax[1,0].set_title("Original Retail, crop=0")
@@ -157,13 +156,13 @@ def thresholding_display(img1, img2):
 
 
 def check_url(url):
-    ''''returns code status from requesting a url'''
+    """returns code status from requesting a url"""
     code = requests.head(url).status_code
     return code
 
 
 def cosine_distance(url_img1, url_img2, model, crop=0):
-    '''calculates cosine distance between 2 images'''
+    """calculates cosine distance between 2 images"""
     assert (model == model_resnet50_v2_avg or model == model_vit), 'wrong input for model'
     assert crop in {0, 1}, 'no crop:0, crop:1'
     try:
@@ -171,7 +170,7 @@ def cosine_distance(url_img1, url_img2, model, crop=0):
             img1 = url_img1
             img2 = url_img2
 
-        if not crop:  # change channels to RGB
+        if not crop:  # If images are not cropped, crop them.
             headers = {'User-Agent': 'Mozilla/5.0 ...'}
 
             response_img1 = requests.get(url_img1, stream=True, headers=headers)
@@ -217,7 +216,7 @@ def cosine_distance(url_img1, url_img2, model, crop=0):
                 embedding = model.predict(img)[0]
                 embeddings.append(embedding)
 
-            if model == model_vit:
+            if model == model_vit:  # Curently using VIT Model
                 # preprocessing
                 inputs = preprocess_img(img, return_tensors="tf")
                 # embedding
@@ -226,29 +225,29 @@ def cosine_distance(url_img1, url_img2, model, crop=0):
 
         embedding1 = embeddings[0]
         embedding2 = embeddings[1]
-        # cosine_distance
+        # calculate similarity index using cosine distance metric
         distance = np.dot(embedding1, embedding2) / (norm(embedding1) * norm(embedding2))
 
     except Exception as e:
         print(e)
         return -1
 
-    if distance > 1:
+    if distance > 1:  # edge case force to 1
         return 1
-    if distance < 0:
+    if distance < 0:  # edge case force to 0
         return 0
 
     return distance
 
 
 def similarity_score(url_img1, url_img2, model, crop=1, blur_kernel=15):
-    '''calculates the similarity score between 2 imgs using a defined model'''
+    """calculates the similarity score between 2 imgs using a defined model"""
     if crop:
         img_cliente = crop_product(url_img1, blur_kernel=blur_kernel)[1]
         img_retail = crop_product(url_img2, blur_kernel=blur_kernel)[1]
         score = cosine_distance(img_cliente, img_retail, model, crop=crop)
 
-    if not crop:
+    if not crop:  # crop before calculating metric
         score = cosine_distance(url_img1, url_img2, model, crop=crop)
 
     return score
