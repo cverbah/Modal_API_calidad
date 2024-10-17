@@ -116,7 +116,7 @@ async def predict_score(url_img_cliente: str, url_img_retail: str, crop: int = Q
 
 @app.function(image=dockerhub_image,
               gpu=gpu.T4(count=1),
-              secret=Secret.from_name("automatch-secret-keys"),)
+              secrets=[Secret.from_name("automatch-secret-keys")],)
 @asgi_app(label='fastapi-image-similarity')
 def img_similarity_app():
     import os
